@@ -1,42 +1,52 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+cd ~/projects/autogrow
+mkdir -p app/api/readings
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+cat > app/api/readings/route.js <<'EOF'
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-export async function POST(request) {
-  try {
-    const { temperature, humidity, ph, tds } = await request.json();
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-    if ([temperature, humidity, ph, tds].some(v => v === undefined)) {
-      return NextResponse.json({ ok: false, error: "Missing fields" }, { status: 400 });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await supabase
-      .from("readings")
-      .insert({ temperature, humidity, ph, tds })
-      .select();
-
-    if (error) throw error;
-    return NextResponse.json({ ok: true, inserted: data?.[0] ?? null });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
-  }
-}
-
+// GET: retourne les 50 dernières mesures
 export async function GET() {
-  try {
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const { data, error } = await supabase
-      .from("readings")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(20);
+  const { data, error } = await supabase
+    .from('readings')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50)
 
-    if (error) throw error;
-    return NextResponse.json({ ok: true, data });
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  return NextResponse.json({ ok: true, data })
 }
+
+// POST: insère une mesure {temperature, humidity, ph, tds}
+export async function POST(req) {
+  const body = await req.json().catch(() => null)
+  if (!body) {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const payload = {
+    temperature: body.temperature ?? null,
+    humidity: body.humidity ?? null,
+    ph: body.ph ?? null,
+    tds: body.tds ?? null,
+    created_at: new Date().toISOString()
+  }
+
+  const { data, error } = await supabase
+    .from('readings')
+    .insert(payload)
+    .select()
+    .single()
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  return NextResponse.json({ ok: true, data }, { status: 201 })
+}
+EOF
