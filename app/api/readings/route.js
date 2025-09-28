@@ -5,7 +5,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// ✅ GET : lire les dernières mesures
+// GET : retourne les dernières mesures
 export async function GET() {
   try {
     const { data, error } = await supabase
@@ -21,11 +21,10 @@ export async function GET() {
   }
 }
 
-// ✅ POST : ajouter une mesure
+// POST : ajoute une mesure
 export async function POST(req) {
   try {
     const { temperature, humidity, ph, tds } = await req.json()
-
     if ([temperature, humidity, ph, tds].some(v => v === undefined)) {
       return NextResponse.json({ ok: false, error: 'Missing field' }, { status: 400 })
     }
